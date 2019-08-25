@@ -1,0 +1,1 @@
+1.修改了skelmap,使得skin的节点与bvh的节点相对应
