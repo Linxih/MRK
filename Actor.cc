@@ -516,15 +516,15 @@ void Actor::LoadAnimation(sdf::ElementPtr _sdf)
     {"LeftForeArm","L_FOREARM"},
     {"LeftHand","L_HAND"},
     {"LeftFingerBase","LSHaThM"},
-    {"LeftHandIndex1","LSHaThM"},
-    {"LThumb","LSHaThM"},
+    {"LeftHandIndex1","L_FINGER02"},
+    {"LThumb","L_FINGER12"},
     {"RightShoulder","R_CLAVICLE"},
     {"RightArm","R_ARM"},
     {"RightForeArm","R_FOREARM"},
     {"RightHand","R_HAND"},
     {"RightFingerBase","RSHaThM"},
-    {"RightHandIndex1","RSHaThM"},
-    {"RThumb","RSHaThM"},
+    {"RightHandIndex1","R_FINGER02"},
+    {"RThumb","R_FINGER12"},
     {"Neck","SBoT3"},
     };
   //align bvh to skin  
@@ -547,16 +547,10 @@ void Actor::AlignBvh(Skeleton *_skel,
   // pose
   for (unsigned int i = 0; i < this->skeleton->GetNumNodes(); ++i)
   {
-    
     SkeletonNode *skinNode = this->skeleton->GetNodeByHandle(i);
     SkeletonNode *animNode = _skel->GetNodeByName(_skelMap[skinNode->GetName()]);  //skelnode of bvh
-    this->rotationAligner[animNode->GetName()] = ignition::math::Matrix4d(skinNode->Transform().Rotation()).Inverse();
-    
 
 
-    //this->translationAligner[animNode->GetName] = ignition::math::Matrix4d(animNode->GetParent())
-  }
-/*
     if (animNode->GetName() ==
         _skelMap[this->skeleton->GetRootNode()->GetName()])
     {
@@ -592,24 +586,31 @@ void Actor::AlignBvh(Skeleton *_skel,
     {
       // if link i has multiple children
       continue;
-    }
+    } 
 
+
+    
     // else, which means link i only has a single child link i+1
 
     // get link i+1 posture direction in world coordinates
-    auto relativeBvh = animNode->GetChild(0)->ModelTransform().Translation()
+    
+    
+    SkeletonNode *skinChildNode = this->skeleton->GetNodeByHandle(i)->GetChild(0);
+    SkeletonNode *animChildNode = _skel->GetNodeByName(_skelMap[skinChildNode->GetName()]);
+    
+      auto relativeBvh = animChildNode->ModelTransform().Translation()
         - animNode->ModelTransform().Translation();
 
-    auto relativeDae = skinNode->GetChild(0)->ModelTransform().Translation()
+    auto relativeDae = skinChildNode->ModelTransform().Translation()
           - skinNode->ModelTransform().Translation();
 
     if (relativeBvh == ignition::math::Vector3d::Zero ||
         relativeDae == ignition::math::Vector3d::Zero)
     {
       // unexpected
-      std::cerr << "Duplicated joint found! This might cause some errors!\n";
+      //std::cerr << "Duplicated joint found! This might cause some errors!\n";
       continue;
-    }
+    } 
 
     // calculate world coordinate rotation quaternion
     // (difference between link i+1 posture)
@@ -618,7 +619,7 @@ void Actor::AlignBvh(Skeleton *_skel,
         relativeBvh.Length()));
 
     // calculate bvh to dae of link i+1
-    this->translationAligner[animNode->GetChild(0)->GetName()] =
+    this->translationAligner[animChildNode->GetName()] =
         ignition::math::Matrix4d(skinNode->ModelTransform().Rotation())
         .Inverse()
         * ignition::math::Matrix4d(ignition::math::Quaterniond(n.Normalize(),
@@ -634,6 +635,12 @@ void Actor::AlignBvh(Skeleton *_skel,
     tmp = tmp * ignition::math::Matrix4d(animNode->ModelTransform().Rotation());
     tmp.SetTranslation(animNode->Transform().Translation());
     animNode->SetTransform(tmp, true);
+
+    
+    
+    
+    
+    
   }
 
   // calculate the rotationAligner : aligner of initial bvh pose to initial dae
@@ -641,7 +648,7 @@ void Actor::AlignBvh(Skeleton *_skel,
   for (unsigned int i = 0; i < this->skeleton->GetNumNodes(); ++i)
   {
     SkeletonNode *skinNode = this->skeleton->GetNodeByHandle(i);
-    SkeletonNode *animNode = _skel->GetNodeByName(_skelMap[this->skeleton->GetNodeByHandle(i)->GetName()]); 
+    SkeletonNode *animNode = _skel->GetNodeByName(_skelMap[skinNode->GetName()]);  //skelnode of bvh
 
     if (animNode->GetName() ==
         _skelMap[this->skeleton->GetRootNode()->GetName()])
@@ -665,7 +672,8 @@ void Actor::AlignBvh(Skeleton *_skel,
         ignition::math::Matrix4d(animNode->Transform().Rotation()).Inverse()
         * this->translationAligner[animNode->GetName()].Inverse()
         * ignition::math::Matrix4d(skinNode->Transform().Rotation());
-  }*/
+  }
+  
 }
 
 //////////////////////////////////////////////////
@@ -829,7 +837,12 @@ void Actor::Update()
   ignition::math::Matrix4d rootTrans =
     frame[skelMap[this->skeleton->GetRootNode()->GetName()]];
 
-  ignition::math::Vector3d rootPos = rootTrans.Translation();
+  ignition::math::Vector3d bvhOffset = rootTrans.Translation();
+  auto daeOffset = this->skeleton->GetRootNode()->Transform().Translation();
+  // scale bvh offset to dae link length
+  ignition::math::Vector3d rootPos = 0.0 * bvhOffset.Normalize();
+
+  //ignition::math::Vector3d rootPos = rootTrans.Translation();
   ignition::math::Quaterniond rootRot = rootTrans.Rotation();
 
   if (tinfo->translated)
@@ -872,18 +885,6 @@ void Actor::SetPose(std::map<std::string, ignition::math::Matrix4d> _frame,
     ignition::math::Matrix4d transform(ignition::math::Matrix4d::Identity);
     if (_frame.find(_skelMap[bone->GetName()]) != _frame.end())
     {
-      /*transform = _frame[_skelMap[bone->GetName()]];
-      if (bone->GetName() != this->skeleton->GetRootNode()->GetName())
-      {
-        ignition::math::Vector3d bvhOffset = transform.Translation();
-        ignition::math::Vector3d daeOffset = bone->Transform().Translation();
-          // scale bvh offset to dae link length
-        transform.SetTranslation(daeOffset.Length() * bvhOffset.Normalize());
-      }
-     
-
-    } */
-
       if (this->bvhFile)
       {
         if(bone->GetName() == "LHipJoint")
@@ -941,30 +942,17 @@ void Actor::SetPose(std::map<std::string, ignition::math::Matrix4d> _frame,
         
       }
 
-      transform = transform * this->rotationAligner[_skelMap[bone->GetName()]];
-      
-    }
-    /*{
-      if (this->bvhFile)
-      {
-        std::string tempStr(_skelMap[bone->GetName()]);
-        transform = _frame[tempStr];
-
-        if (bone->GetName() != this->skeleton->GetRootNode()->GetName())
+      if (bone->GetName() != this->skeleton->GetRootNode()->GetName())
         {
           ignition::math::Vector3d bvhOffset = transform.Translation();
            ignition::math::Vector3d daeOffset = bone->Transform().Translation();
           // scale bvh offset to dae link length
           transform.SetTranslation(daeOffset.Length() * bvhOffset.Normalize());
         }
-
-        transform = this->translationAligner[tempStr] * transform *
-            this->rotationAligner[tempStr];
-      }
-      else
-      {
-        transform = _frame[_skelMap[bone->GetName()]];
-      }*/
+        transform = this->translationAligner[_skelMap[bone->GetName()]] * transform *
+            this->rotationAligner[_skelMap[bone->GetName()]];
+    }
+    
       
     
     else
