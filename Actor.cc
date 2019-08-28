@@ -635,12 +635,6 @@ void Actor::AlignBvh(Skeleton *_skel,
     tmp = tmp * ignition::math::Matrix4d(animNode->ModelTransform().Rotation());
     tmp.SetTranslation(animNode->Transform().Translation());
     animNode->SetTransform(tmp, true);
-
-    
-    
-    
-    
-    
   }
 
   // calculate the rotationAligner : aligner of initial bvh pose to initial dae
@@ -848,6 +842,7 @@ void Actor::Update()
   if (tinfo->translated)
     rootPos.X() = 0.0;
   ignition::math::Pose3d actorPose;
+  
   actorPose.Pos() = modelPose.Pos() + modelPose.Rot().RotateVector(rootPos);
   if (!this->customTrajectoryInfo)
     actorPose.Rot() = modelPose.Rot() * rootRot;
@@ -890,12 +885,12 @@ void Actor::SetPose(std::map<std::string, ignition::math::Matrix4d> _frame,
         if(bone->GetName() == "LHipJoint")
         {
           transform = _frame[_skelMap[bone->GetName()]];
-          transform = _frame["ema_50percMaleMesh"] * _frame["ROOT"] * transform;
+          transform = _frame["ROOT"] * _frame["ema_50percMaleMesh"] * transform;
         }
         else if(bone->GetName() == "RHipJoint")
         {
           transform = _frame[_skelMap[bone->GetName()]];
-          transform = _frame["ema_50percMaleMesh"] * _frame["ROOT"] * transform;
+          transform = _frame["ROOT"] * _frame["ema_50percMaleMesh"] * transform;
         }
         else if(bone->GetName() == "LeftToeBase")
         {
@@ -910,12 +905,12 @@ void Actor::SetPose(std::map<std::string, ignition::math::Matrix4d> _frame,
         else if(bone->GetName() == "LowerBack")
         {
           transform = _frame[_skelMap[bone->GetName()]];
-          transform = _frame["ema_50percMaleMesh"] * _frame["ROOT"] * _frame["PELVIS"] * transform;
+          transform = _frame["ROOT"] * _frame["ema_50percMaleMesh"] * _frame["PELVIS"] * transform;
         }
         else if(bone->GetName() == "Neck1")
         {
           transform = _frame[_skelMap[bone->GetName()]];
-          transform = _frame["SBoT2"] * _frame["SBoT1"] * transform;
+          transform = _frame["SBoT1"] * _frame["SBoT2"] * transform;
         }
         else if(bone->GetName() == "LeftShoulder")
         {
@@ -949,8 +944,8 @@ void Actor::SetPose(std::map<std::string, ignition::math::Matrix4d> _frame,
           // scale bvh offset to dae link length
           transform.SetTranslation(daeOffset.Length() * bvhOffset.Normalize());
         }
-        transform = this->translationAligner[_skelMap[bone->GetName()]] * transform *
-            this->rotationAligner[_skelMap[bone->GetName()]];
+        transform = this->translationAligner[_skelMap[bone->GetName()]] * transform * this->rotationAligner[_skelMap[bone->GetName()]];
+        
     }
     
       
