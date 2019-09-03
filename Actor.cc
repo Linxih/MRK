@@ -499,12 +499,12 @@ void Actor::LoadAnimation(sdf::ElementPtr _sdf)
     {"LHipJoint","L_HIP"},
     {"LeftUpLeg","L_THIGH"},
     {"LeftLeg","L_LEG"},
-    {"LeftFoot","L_FOOT"},
+    {"LeftFoot","LSFoTa"},
     {"LeftToeBase","L_TOES"},
     {"RHipJoint","R_HIP"},
     {"RightUpLeg","R_THIGH"},
     {"RightLeg","R_LEG"},
-    {"RightFoot","R_FOOT"},
+    {"RightFoot","RSFoTa"},
     {"RightToeBase","R_TOES"},
     {"LowerBack","LOWER_BODY"},
     {"Spine","MIDDLE_BODY"},
@@ -543,32 +543,56 @@ void Actor::LoadAnimation(sdf::ElementPtr _sdf)
 void Actor::AlignBvh(Skeleton *_skel,
     std::map<std::string, std::string> _skelMap)
 {
+  /*for (unsigned int i = 0; i < _skel->GetNumNodes(); ++i)
+  {
+    
+    SkeletonNode *animNode = _skel->GetNodeByHandle(i);  //skelnode of bvh
+
+    auto fix = ignition::math::Matrix4d(ignition::math::Quaterniond(1, 0, 0, IGN_DTOR(90)));
+    ignition::math::Matrix4d trans = animNode->ModelTransform();
+    trans = fix.Inverse() * trans * fix;
+    auto mix = ignition::math::Matrix4d::Identity;
+    mix.SetTranslation(trans.Translation());
+    animNode->SetModelTransform(mix);
+    
+  } */
+
+
+
   // calculate translationAligner: aligner of initial bvh pose to initial dae
   // pose
   for (unsigned int i = 0; i < this->skeleton->GetNumNodes(); ++i)
   {
     SkeletonNode *skinNode = this->skeleton->GetNodeByHandle(i);
+
     SkeletonNode *animNode = _skel->GetNodeByName(_skelMap[skinNode->GetName()]);  //skelnode of bvh
+
+    
 
 
     if (animNode->GetName() ==
-        _skelMap[this->skeleton->GetRootNode()->GetName()])
+        _skelMap[this->skeleton->GetRootNode()->GetName()]) //[mensch..] = (0, 0, 0, 0, 0, 0)
     {
+      //auto fix = ignition::math::Matrix4d(ignition::math::Quaterniond(1, 0, 0, IGN_DTOR(90)));
+      //auto root = animNode->Transform();
+      //root = fix * root;
+      //animNode->SetTransform(root, true);
       // if this is root, then some setup is needed to match bvh and dae 根节点
       this->translationAligner[animNode->GetName()] =
-          ignition::math::Matrix4d(this->skeleton->GetRootNode()->Transform().Rotation());
+          ignition::math::Matrix4d(this->skeleton->GetRootNode()->Transform().Rotation()); // 1
       auto tmp = this->translationAligner[animNode->GetName()];
       tmp.SetTranslation(animNode->Transform().Translation());
+      //tmp = tmp * fix;
       animNode->SetTransform(tmp, true);
-    }
+    } 
 
     if (animNode->GetParent() != nullptr) //不是根节点
     {
-      // parent link has multiple child links 有多个子节点
+      // parent link has multiple child links  LHip RHiP Lowerback neck shoulder fingerbase thumb
         if (skinNode->Transform().Translation()
             == ignition::math::Vector3d::Zero)
         {
-          // parent link is a virtual link (has no length)
+          // parent link is a virtual link (has no length) translationaligner  = 1
           this->translationAligner[animNode->GetName()] =
               ignition::math::Matrix4d::Identity;
         } 
@@ -584,7 +608,7 @@ void Actor::AlignBvh(Skeleton *_skel,
 
     if (animNode->GetChildCount() > 1)
     {
-      // if link i has multiple children
+      // if link i has multiple childrenR_THIGH
       continue;
     } 
 
@@ -816,27 +840,39 @@ void Actor::Update()
       frame = skelAnim->PoseAtX(this->pathLength,
                 skelMap[this->skeleton->GetRootNode()->GetName()]);
     }
-    else
+    else 
     {
       frame = skelAnim->PoseAt(this->scriptTime);
     }
+    
   }
   else
   {
     frame = skelAnim->PoseAt(this->scriptTime);
   }
 
+  //auto temp = frame[skelMap[this->skeleton->GetRootNode()->GetName()]];
+
+  //auto fix = ignition::math::Matrix4d(ignition::math::Quaterniond(1, 0, 0, IGN_DTOR(-90)));
+  //auto fiy = ignition::math::Matrix4d(ignition::math::Quaterniond(0, 1, 0, IGN_DTOR(-90)));
+
+  //frame[skelMap[this->skeleton->GetRootNode()->GetName()]] = temp * fix * fiy ;
+
+  
+
   this->lastTraj = tinfo->id;
+
+
 
   ignition::math::Matrix4d rootTrans =
     frame[skelMap[this->skeleton->GetRootNode()->GetName()]];
 
-  ignition::math::Vector3d bvhOffset = rootTrans.Translation();
-  auto daeOffset = this->skeleton->GetRootNode()->Transform().Translation();
+  //ignition::math::Vector3d bvhOffset = rootTrans.Translation();
+  //auto daeOffset = this->skeleton->GetRootNode()->Transform().Translation();
   // scale bvh offset to dae link length
-  ignition::math::Vector3d rootPos = 0.0 * bvhOffset.Normalize();
+  //ignition::math::Vector3d rootPos = 0.0 * bvhOffset.Normalize();
 
-  //ignition::math::Vector3d rootPos = rootTrans.Translation();
+  ignition::math::Vector3d rootPos = rootTrans.Translation();
   ignition::math::Quaterniond rootRot = rootTrans.Rotation();
 
   if (tinfo->translated)
@@ -880,37 +916,40 @@ void Actor::SetPose(std::map<std::string, ignition::math::Matrix4d> _frame,
     ignition::math::Matrix4d transform(ignition::math::Matrix4d::Identity);
     if (_frame.find(_skelMap[bone->GetName()]) != _frame.end())
     {
+
       if (this->bvhFile)
       {
         if(bone->GetName() == "LHipJoint")
         {
           transform = _frame[_skelMap[bone->GetName()]];
-          transform = _frame["ROOT"] * _frame["ema_50percMaleMesh"] * transform;
+          transform = _frame["ema_50percMaleMesh"] *_frame["ROOT"] * transform;
         }
         else if(bone->GetName() == "RHipJoint")
         {
           transform = _frame[_skelMap[bone->GetName()]];
-          transform = _frame["ROOT"] * _frame["ema_50percMaleMesh"] * transform;
+          transform = _frame["ema_50percMaleMesh"] * _frame["ROOT"] * transform;
         }
-        else if(bone->GetName() == "LeftToeBase")
+        else if(bone->GetName() == "LeftFoot")
         {
           transform = _frame[_skelMap[bone->GetName()]];
-          transform = _frame["LSFoTa"] * transform;
+          transform = _frame["L_FOOT"] * transform;
         }
-        else if(bone->GetName() == "RightToeBase")
+        else if(bone->GetName() == "RightFoot")
         {
           transform = _frame[_skelMap[bone->GetName()]];
-          transform = _frame["RSFoTa"] * transform;
+          transform = _frame["R_FOOT"] * transform;
         }
         else if(bone->GetName() == "LowerBack")
         {
           transform = _frame[_skelMap[bone->GetName()]];
-          transform = _frame["ROOT"] * _frame["ema_50percMaleMesh"] * _frame["PELVIS"] * transform;
+            
+          transform = _frame["ema_50percMaleMesh"] * _frame["ROOT"] * _frame["PELVIS"] * transform;
         }
+        
         else if(bone->GetName() == "Neck1")
         {
           transform = _frame[_skelMap[bone->GetName()]];
-          transform = _frame["SBoT1"] * _frame["SBoT2"] * transform;
+          transform = _frame["SBoT2"] * _frame["SBoT1"] * transform;
         }
         else if(bone->GetName() == "LeftShoulder")
         {
@@ -931,20 +970,44 @@ void Actor::SetPose(std::map<std::string, ignition::math::Matrix4d> _frame,
         {
           transform = _frame[_skelMap[bone->GetName()]];
           transform = _frame["R_SHOULDER"] * transform;
-        }
+        } 
         else
           transform = _frame[_skelMap[bone->GetName()]];
         
       }
 
-      if (bone->GetName() != this->skeleton->GetRootNode()->GetName())
+       if (bone->GetName() != this->skeleton->GetRootNode()->GetName())
         {
           ignition::math::Vector3d bvhOffset = transform.Translation();
            ignition::math::Vector3d daeOffset = bone->Transform().Translation();
           // scale bvh offset to dae link length
           transform.SetTranslation(daeOffset.Length() * bvhOffset.Normalize());
         }
+
+      
+     
+     
+      if(bone->GetName() == "Hips")
+      {
+        auto fix = ignition::math::Matrix4d(ignition::math::Quaterniond(1, 0, 0, 1.57));
+        transform = fix * transform ;
+      } 
+      else
+      {
         transform = this->translationAligner[_skelMap[bone->GetName()]] * transform * this->rotationAligner[_skelMap[bone->GetName()]];
+      }
+      
+     
+      
+      /*if(bone->GetName() == "LHipJoint")
+      {
+        ignition::math::Matrix4d fixHip(ignition::math::Quaterniond(1,0,0,IGN_DTOR(60)));
+        
+        transform = transform * fixHip;
+        //ignition::math::Vector3d n(0, 0.866, 0.5);
+        //ignition::math::Vector3d daeOffset = bone->Transform().Translation();
+        //transform.SetTranslation(daeOffset.Length() * n.Normalize()) ;
+      } */
         
     }
     
