@@ -914,6 +914,9 @@ void Actor::SetPose(std::map<std::string, ignition::math::Matrix4d> _frame,
     SkeletonNode *bone = this->skeleton->GetNodeByHandle(i);
     SkeletonNode *parentBone = bone->GetParent();
     ignition::math::Matrix4d transform(ignition::math::Matrix4d::Identity);
+    ignition::math::Vector3d xAxis(1, 0, 0);
+    ignition::math::Vector3d yAxis(0, 1, 0);
+    ignition::math::Vector3d zAxis(0, 0, 1);
     if (_frame.find(_skelMap[bone->GetName()]) != _frame.end())
     {
 
@@ -941,9 +944,15 @@ void Actor::SetPose(std::map<std::string, ignition::math::Matrix4d> _frame,
         }
         else if(bone->GetName() == "LowerBack")
         {
-          transform = _frame[_skelMap[bone->GetName()]];
-            
+          //auto fix = ignition::math::Matrix4d(ignition::math::Quaterniond(yAxis, IGN_DTOR(90)));
+          transform = _frame[_skelMap[bone->GetName()]];            
           transform = _frame["ema_50percMaleMesh"] * _frame["ROOT"] * _frame["PELVIS"] * transform;
+          //transform = fix.Inverse() * transform * fix;
+          //auto temp = ignition::math::Matrix4d(transform.Rotation());
+          //temp = fix * temp;
+          //temp.SetTranslation(transform.Translation());
+          //transform = temp;
+          
         }
         
         else if(bone->GetName() == "Neck1")
@@ -976,6 +985,8 @@ void Actor::SetPose(std::map<std::string, ignition::math::Matrix4d> _frame,
         
       }
 
+       
+       
        if (bone->GetName() != this->skeleton->GetRootNode()->GetName())
         {
           ignition::math::Vector3d bvhOffset = transform.Translation();
@@ -983,23 +994,22 @@ void Actor::SetPose(std::map<std::string, ignition::math::Matrix4d> _frame,
           // scale bvh offset to dae link length
           transform.SetTranslation(daeOffset.Length() * bvhOffset.Normalize());
         }
-
+        
+        //transform = this->translationAligner[_skelMap[bone->GetName()]] * transform * this->rotationAligner[_skelMap[bone->GetName()]];
+      
       
      
-     
+      /*
+      
       if(bone->GetName() == "Hips")
       {
         auto fix = ignition::math::Matrix4d(ignition::math::Quaterniond(1, 0, 0, 1.57));
         transform = fix * transform ;
       } 
       else
-      {
-        transform = this->translationAligner[_skelMap[bone->GetName()]] * transform * this->rotationAligner[_skelMap[bone->GetName()]];
-      }
-      
-     
-      
-      /*if(bone->GetName() == "LHipJoint")
+
+
+      if(bone->GetName() == "LHipJoint")
       {
         ignition::math::Matrix4d fixHip(ignition::math::Quaterniond(1,0,0,IGN_DTOR(60)));
         
